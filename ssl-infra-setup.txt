@@ -1,8 +1,3 @@
-https://www.golinuxcloud.com/openssl-create-certificate-chain-linux/
-
-
-
-
 yum -y install openssl 
 dnf -y install tree
 mkdir -p ~/myCA/rootCA/{certs,crl,newcerts,private,csr}
