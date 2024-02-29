@@ -1,0 +1,466 @@
+yum -y install openssl 
+dnf -y install tree
+
+mkdir -p /data/ssl && cd /data/ssl
+
+
+mkdir -p /data/ssl/rootCA/{certs,crl,newcerts,private,csr}
+mkdir -p /data/ssl/intermediateCA1/{certs,crl,newcerts,private,csr}
+mkdir -p /data/ssl/intermediateCA2/{certs,crl,newcerts,private,csr}
+mkdir -p /data/ssl/intermediateCA3/{certs,crl,newcerts,private,csr}
+mkdir -p /data/ssl/client/
+
+echo 1000 > /data/ssl/rootCA/serial
+echo 0100 > /data/ssl/rootCA/crlnumber 
+touch /data/ssl/rootCA/index.txt
+
+echo 1000 > /data/ssl/intermediateCA1/serial 
+echo 0100 > /data/ssl/intermediateCA1/crlnumber
+touch /data/ssl/intermediateCA1/index.txt
+
+echo 1000 > /data/ssl/intermediateCA2/serial 
+echo 0100 > /data/ssl/intermediateCA2/crlnumber
+touch /data/ssl/intermediateCA2/index.txt
+
+echo 1000 > /data/ssl/intermediateCA3/serial 
+echo 0100 > /data/ssl/intermediateCA3/crlnumber
+touch /data/ssl/intermediateCA3/index.txt
+
+tree /data/ssl
+##############################################################################################
+##############################################################################################
+##############################################################################################
+##############################################################################################
+vi openssl_root.cnf
+[ ca ]                                                   # The default CA section
+default_ca = CA_default                                  # The default CA name
+
+[ CA_default ]                                           # Default settings for the CA
+dir               = /data/ssl/rootCA                     # CA directory
+certs             = $dir/certs                           # Certificates directory
+crl_dir           = $dir/crl                             # CRL directory
+new_certs_dir     = $dir/newcerts                        # New certificates directory
+database          = $dir/index.txt                       # Certificate index file
+serial            = $dir/serial                          # Serial number file
+RANDFILE          = $dir/private/.rand                   # Random number file
+private_key       = $dir/private/ca.key                  # Root CA private key
+certificate       = $dir/certs/ca.crt                    # Root CA certificate
+crl               = $dir/crl/ca.crl                      # Root CA CRL
+crlnumber         = $dir/crlnumber                       # Root CA CRL number
+crl_extensions    = crl_ext                              # CRL extensions
+default_crl_days  = 30                                   # Default CRL validity days
+default_md        = sha256                               # Default message digest
+preserve          = no                                   # Preserve existing extensions
+email_in_dn       = no                                   # Exclude email from the DN
+name_opt          = ca_default                           # Formatting options for names
+cert_opt          = ca_default                           # Certificate output options
+policy            = policy_strict                        # Certificate policy
+unique_subject    = no                                   # Allow multiple certs with the same DN
+
+[ policy_strict ]                                        # Policy for stricter validation
+countryName             = match                          # Must match the issuer's country
+stateOrProvinceName     = match                          # Must match the issuer's state
+organizationName        = match                          # Must match the issuer's organization
+organizationalUnitName  = optional                       # Organizational unit is optional
+commonName              = supplied                       # Must provide a common name
+emailAddress            = optional                       # Email address is optional
+
+[ req ]                                                  # Request settings
+default_bits        = 2048                               # Default key size
+distinguished_name  = req_distinguished_name             # Default DN template
+string_mask         = utf8only                           # UTF-8 encoding
+default_md          = sha256                             # Default message digest
+prompt              = no                                 # Non-interactive mode
+
+[ req_distinguished_name ]                               # Template for the DN in the CSR
+countryName                     = Country Name (2 letter code)
+stateOrProvinceName             = State or Province Name (full name)
+localityName                    = Locality Name (city)
+0.organizationName              = Organization Name (company)
+organizationalUnitName          = Organizational Unit Name (section)
+commonName                      = Common Name (your domain)
+emailAddress                    = Email Address
+
+[ v3_ca ]                                           # Root CA certificate extensions
+subjectKeyIdentifier = hash                         # Subject key identifier
+authorityKeyIdentifier = keyid:always,issuer        # Authority key identifier
+basicConstraints = critical, CA:true, pathlen:3     # Basic constraints for a CA
+keyUsage = critical, keyCertSign, cRLSign           # Key usage for a CA
+
+[ crl_ext ]                                         # CRL extensions
+authorityKeyIdentifier = keyid:always,issuer        # Authority key identifier
+
+[ v3_intermediate_ca ]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = critical, CA:true, pathlen:3
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+##############################################################################################
+##############################################################################################
+##############################################################################################
+##############################################################################################
+
+vi openssl_intermediate1.cnf
+[ ca ]                           # The default CA section
+default_ca = CA_default          # The default CA name
+
+[ CA_default ]                                           # Default settings for the intermediate CA
+dir               = /data/ssl/intermediateCA1     # Intermediate CA directory
+certs             = $dir/certs                           # Certificates directory
+crl_dir           = $dir/crl                             # CRL directory
+new_certs_dir     = $dir/newcerts                        # New certificates directory
+database          = $dir/index.txt                       # Certificate index file
+serial            = $dir/serial                          # Serial number file
+RANDFILE          = $dir/private/.rand                   # Random number file
+private_key       = $dir/private/intermediate1.key       # Intermediate CA private key
+certificate       = $dir/certs/intermediate1.crt         # Intermediate CA certificate
+crl               = $dir/crl/intermediate1.crl           # Intermediate CA CRL
+crlnumber         = $dir/crlnumber                       # Intermediate CA CRL number
+crl_extensions    = crl_ext                              # CRL extensions
+default_crl_days  = 30                                   # Default CRL validity days
+default_md        = sha256                               # Default message digest
+preserve          = no                                   # Preserve existing extensions
+email_in_dn       = no                                   # Exclude email from the DN
+name_opt          = ca_default                           # Formatting options for names
+cert_opt          = ca_default                           # Certificate output options
+policy            = policy_loose                         # Certificate policy
+
+[ policy_loose ]                                         # Policy for less strict validation
+countryName             = optional                       # Country is optional
+stateOrProvinceName     = optional                       # State or province is optional
+localityName            = optional                       # Locality is optional
+organizationName        = optional                       # Organization is optional
+organizationalUnitName  = optional                       # Organizational unit is optional
+commonName              = supplied                       # Must provide a common name
+emailAddress            = optional                       # Email address is optional
+
+[ req ]                                                  # Request settings
+default_bits        = 2048                               # Default key size
+distinguished_name  = req_distinguished_name             # Default DN template
+string_mask         = utf8only                           # UTF-8 encoding
+default_md          = sha256                             # Default message digest
+x509_extensions     = v3_intermediate_ca                 # Extensions for intermediate CA certificate
+
+[ req_distinguished_name ]                               # Template for the DN in the CSR
+countryName                     = Country Name (2 letter code)
+stateOrProvinceName             = State or Province Name
+localityName                    = Locality Name
+0.organizationName              = Organization Name
+organizationalUnitName          = Organizational Unit Name
+commonName                      = Common Name
+emailAddress                    = Email Address
+
+[ v3_intermediate_ca ]                                      # Intermediate CA certificate extensions
+subjectKeyIdentifier = hash                                 # Subject key identifier
+authorityKeyIdentifier = keyid:always,issuer                # Authority key identifier
+basicConstraints = critical, CA:true, pathlen:3             # Basic constraints for a CA
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign # Key usage for a CA
+
+[ crl_ext ]                                                 # CRL extensions
+authorityKeyIdentifier=keyid:always                         # Authority key identifier
+
+[ server_cert ]                                             # Server certificate extensions
+basicConstraints = CA:FALSE                                 # Not a CA certificate
+nsCertType = server                                         # Server certificate type
+keyUsage = critical, digitalSignature, keyEncipherment      # Key usage for a server cert
+extendedKeyUsage = serverAuth                               # Extended key usage for server authentication purposes (e.g., TLS/SSL servers).
+authorityKeyIdentifier = keyid,issuer                       # Authority key identifier linking the certificate to the issuer's public key.
+##############################################################################################
+##############################################################################################
+##############################################################################################
+##############################################################################################
+vi openssl_intermediate2.cnf
+[ ca ]                           # The default CA section
+default_ca = CA_default          # The default CA name
+
+[ CA_default ]                                           # Default settings for the intermediate CA
+dir               = /data/ssl/intermediateCA2     # Intermediate CA directory
+certs             = $dir/certs                           # Certificates directory
+crl_dir           = $dir/crl                             # CRL directory
+new_certs_dir     = $dir/newcerts                        # New certificates directory
+database          = $dir/index.txt                       # Certificate index file
+serial            = $dir/serial                          # Serial number file
+RANDFILE          = $dir/private/.rand                   # Random number file
+private_key       = $dir/private/intermediate2.key       # Intermediate CA private key
+certificate       = $dir/certs/intermediate2.crt         # Intermediate CA certificate
+crl               = $dir/crl/intermediate2.crl           # Intermediate CA CRL
+crlnumber         = $dir/crlnumber                       # Intermediate CA CRL number
+crl_extensions    = crl_ext                              # CRL extensions
+default_crl_days  = 30                                   # Default CRL validity days
+default_md        = sha256                               # Default message digest
+preserve          = no                                   # Preserve existing extensions
+email_in_dn       = no                                   # Exclude email from the DN
+name_opt          = ca_default                           # Formatting options for names
+cert_opt          = ca_default                           # Certificate output options
+policy            = policy_loose                         # Certificate policy
+
+[ policy_loose ]                                         # Policy for less strict validation
+countryName             = optional                       # Country is optional
+stateOrProvinceName     = optional                       # State or province is optional
+localityName            = optional                       # Locality is optional
+organizationName        = optional                       # Organization is optional
+organizationalUnitName  = optional                       # Organizational unit is optional
+commonName              = supplied                       # Must provide a common name
+emailAddress            = optional                       # Email address is optional
+
+[ req ]                                                  # Request settings
+default_bits        = 2048                               # Default key size
+distinguished_name  = req_distinguished_name             # Default DN template
+string_mask         = utf8only                           # UTF-8 encoding
+default_md          = sha256                             # Default message digest
+x509_extensions     = v3_intermediate_ca                 # Extensions for intermediate CA certificate
+
+[ req_distinguished_name ]                               # Template for the DN in the CSR
+countryName                     = Country Name (2 letter code)
+stateOrProvinceName             = State or Province Name
+localityName                    = Locality Name
+0.organizationName              = Organization Name
+organizationalUnitName          = Organizational Unit Name
+commonName                      = Common Name
+emailAddress                    = Email Address
+
+[ v3_intermediate_ca ]                                      # Intermediate CA certificate extensions
+subjectKeyIdentifier = hash                                 # Subject key identifier
+authorityKeyIdentifier = keyid:always,issuer                # Authority key identifier
+basicConstraints = critical, CA:true, pathlen:1             # Basic constraints for a CA
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign # Key usage for a CA
+
+[ crl_ext ]                                                 # CRL extensions
+authorityKeyIdentifier=keyid:always                         # Authority key identifier
+
+[ server_cert ]                                             # Server certificate extensions
+basicConstraints = CA:FALSE                                 # Not a CA certificate
+nsCertType = server                                         # Server certificate type
+keyUsage = critical, digitalSignature, keyEncipherment      # Key usage for a server cert
+extendedKeyUsage = serverAuth                               # Extended key usage for server authentication purposes (e.g., TLS/SSL servers).
+authorityKeyIdentifier = keyid,issuer                       # Authority key identifier linking the certificate to the issuer's public key.
+##############################################################################################
+##############################################################################################
+##############################################################################################
+##############################################################################################
+vi openssl_intermediate3.cnf
+[ ca ]                           # The default CA section
+default_ca = CA_default          # The default CA name
+
+[ CA_default ]                                           # Default settings for the intermediate CA
+dir               = /data/ssl/intermediateCA3            # Intermediate CA directory
+certs             = $dir/certs                           # Certificates directory
+crl_dir           = $dir/crl                             # CRL directory
+new_certs_dir     = $dir/newcerts                        # New certificates directory
+database          = $dir/index.txt                       # Certificate index file
+serial            = $dir/serial                          # Serial number file
+RANDFILE          = $dir/private/.rand                   # Random number file
+private_key       = $dir/private/intermediate3.key       # Intermediate CA private key
+certificate       = $dir/certs/intermediate3.crt         # Intermediate CA certificate
+crl               = $dir/crl/intermediate3.crl           # Intermediate CA CRL
+crlnumber         = $dir/crlnumber                       # Intermediate CA CRL number
+crl_extensions    = crl_ext                              # CRL extensions
+default_crl_days  = 30                                   # Default CRL validity days
+default_md        = sha256                               # Default message digest
+preserve          = no                                   # Preserve existing extensions
+email_in_dn       = no                                   # Exclude email from the DN
+name_opt          = ca_default                           # Formatting options for names
+cert_opt          = ca_default                           # Certificate output options
+policy            = policy_loose                         # Certificate policy
+
+[ policy_loose ]                                         # Policy for less strict validation
+countryName             = optional                       # Country is optional
+stateOrProvinceName     = optional                       # State or province is optional
+localityName            = optional                       # Locality is optional
+organizationName        = optional                       # Organization is optional
+organizationalUnitName  = optional                       # Organizational unit is optional
+commonName              = supplied                       # Must provide a common name
+emailAddress            = optional                       # Email address is optional
+
+[ req ]                                                  # Request settings
+default_bits        = 2048                               # Default key size
+distinguished_name  = req_distinguished_name             # Default DN template
+string_mask         = utf8only                           # UTF-8 encoding
+default_md          = sha256                             # Default message digest
+x509_extensions     = v3_intermediate_ca                 # Extensions for intermediate CA certificate
+
+[ req_distinguished_name ]                               # Template for the DN in the CSR
+countryName                     = Country Name (2 letter code)
+stateOrProvinceName             = State or Province Name
+localityName                    = Locality Name
+0.organizationName              = Organization Name
+organizationalUnitName          = Organizational Unit Name
+commonName                      = Common Name
+emailAddress                    = Email Address
+
+[ v3_intermediate_ca ]                                      # Intermediate CA certificate extensions
+subjectKeyIdentifier = hash                                 # Subject key identifier
+authorityKeyIdentifier = keyid:always,issuer                # Authority key identifier
+basicConstraints = critical, CA:true, pathlen:0             # Basic constraints for a CA
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign # Key usage for a CA
+
+[ crl_ext ]                                                 # CRL extensions
+authorityKeyIdentifier=keyid:always                         # Authority key identifier
+
+[ server_cert ]                                             # Server certificate extensions
+basicConstraints = CA:FALSE                                 # Not a CA certificate
+nsCertType = server                                         # Server certificate type
+keyUsage = critical, digitalSignature, keyEncipherment      # Key usage for a server cert
+extendedKeyUsage = serverAuth                               # Extended key usage for server authentication purposes (e.g., TLS/SSL servers).
+authorityKeyIdentifier = keyid,issuer                       # Authority key identifier linking the certificate to the issuer's public key.
+##############################################################################################
+##############################################################################################
+##########################                   ROOT CA                 #########################
+##############################################################################################
+openssl genrsa -out /data/ssl/rootCA/private/ca.key 4096
+chmod 400 /data/ssl/rootCA/private/ca.key
+openssl rsa -noout -text -in /data/ssl/rootCA/private/ca.key
+openssl req -config openssl_root.cnf -key /data/ssl/rootCA/private/ca.key -new -x509 -days 7300 -sha256 -extensions v3_ca -out /data/ssl/rootCA/certs/ca.crt -subj "/C=SG/ST=Singapore/L=Bedok/O=Home/OU=IT Department/CN=Root CA"
+chmod 444 /data/ssl/rootCA/certs/ca.crt
+openssl x509 -noout -text -in /data/ssl/rootCA/certs/ca.crt 
+###############################################################################################################################################################
+###############################################                     FIRST CA                       ############################################################
+###############################################################################################################################################################
+###############################################################################################################################################################
+openssl genrsa -out /data/ssl/intermediateCA1/private/intermediate1.key 4096
+chmod 400 /data/ssl/intermediateCA1/private/intermediate1.key
+openssl req -config openssl_intermediate1.cnf -key /data/ssl/intermediateCA1/private/intermediate1.key -new -sha256 -out /data/ssl/intermediateCA1/certs/intermediate1.csr  -subj "/C=SG/ST=Singapore/L=Bedok/O=Home/OU=IT Department/CN=Intermediate CA1" 
+openssl ca -config openssl_root.cnf -extensions v3_intermediate_ca -days 3650 -notext -md sha256 -in /data/ssl/intermediateCA1/certs/intermediate1.csr -out /data/ssl/intermediateCA1/certs/intermediate1.crt
+chmod 444 /data/ssl/intermediateCA1/certs/intermediate1.crt
+cat /data/ssl/rootCA/index.txt
+openssl x509 -noout -text -in /data/ssl/intermediateCA1/certs/intermediate1.crt
+----------------------------
+cat /data/ssl/intermediateCA1/certs/intermediate1.crt /data/ssl/rootCA/certs/ca.crt > /data/ssl/intermediateCA1/certs/ca-chain.crt
+openssl verify -CAfile /data/ssl/intermediateCA1/certs/ca-chain.crt /data/ssl/intermediateCA1/certs/intermediate1.crt
+###############################################################################################################################################################
+###############################################                     SECOND CA                       ###########################################################
+###############################################################################################################################################################
+###############################################################################################################################################################
+openssl genrsa -out /data/ssl/intermediateCA2/private/intermediate2.key 4096
+chmod 400 /data/ssl/intermediateCA2/private/intermediate2.key
+openssl req -config openssl_intermediate2.cnf -key /data/ssl/intermediateCA2/private/intermediate2.key -new -sha256 -out /data/ssl/intermediateCA2/certs/intermediate2.csr -subj "/C=SG/ST=Singapore/L=Bedok/O=Home/OU=IT Department/CN=Intermediate CA2" 
+openssl ca -config openssl_intermediate1.cnf -extensions v3_intermediate_ca -days 375 -notext -md sha256 -in /data/ssl/intermediateCA2/certs/intermediate2.csr -out /data/ssl/intermediateCA2/certs/intermediate2.crt
+chmod 444 /data/ssl/intermediateCA2/certs/intermediate2.crt
+cat /data/ssl/intermediateCA1/index.txt
+openssl x509 -noout -text -in /data/ssl/intermediateCA2/certs/intermediate2.crt
+----------------------------
+cat /data/ssl/intermediateCA2/certs/intermediate2.crt /data/ssl/intermediateCA1/certs/intermediate1.crt /data/ssl/rootCA/certs/ca.crt > /data/ssl/intermediateCA2/certs/ca-chain.crt
+openssl verify -CAfile /data/ssl/intermediateCA2/certs/ca-chain.crt /data/ssl/intermediateCA2/certs/intermediate2.crt
+openssl verify -CAfile /data/ssl/intermediateCA2/certs/ca-chain.crt /data/ssl/intermediateCA1/certs/intermediate1.crt
+----------------------------
+###############################################################################################################################################################
+###############################################                     THIRD CA                       ############################################################
+###############################################################################################################################################################
+###############################################################################################################################################################
+openssl genrsa -out /data/ssl/intermediateCA3/private/intermediate3.key 4096
+chmod 400 /data/ssl/intermediateCA3/private/intermediate3.key
+openssl req -config openssl_intermediate3.cnf -key /data/ssl/intermediateCA3/private/intermediate3.key -new -sha256 -out /data/ssl/intermediateCA3/certs/intermediate3.csr -subj "/C=SG/ST=Singapore/L=Bedok/O=Home/OU=IT Department/CN=Intermediate CA3" 
+openssl ca -config openssl_intermediate2.cnf -extensions v3_intermediate_ca -days 375 -notext -md sha256 -in /data/ssl/intermediateCA3/certs/intermediate3.csr -out /data/ssl/intermediateCA3/certs/intermediate3.crt
+chmod 444 /data/ssl/intermediateCA3/certs/intermediate3.crt
+cat /data/ssl/intermediateCA2/index.txt
+openssl x509 -noout -text -in /data/ssl/intermediateCA3/certs/intermediate3.crt
+----------------------------
+cat /data/ssl/intermediateCA3/certs/intermediate3.crt /data/ssl/intermediateCA2/certs/intermediate2.crt /data/ssl/intermediateCA1/certs/intermediate1.crt /data/ssl/rootCA/certs/ca.crt > /data/ssl/intermediateCA3/certs/ca-chain.crt
+openssl verify -CAfile /data/ssl/intermediateCA3/certs/ca-chain.crt /data/ssl/intermediateCA3/certs/intermediate3.crt
+openssl verify -CAfile /data/ssl/intermediateCA3/certs/ca-chain.crt /data/ssl/intermediateCA2/certs/intermediate2.crt
+openssl verify -CAfile /data/ssl/intermediateCA3/certs/ca-chain.crt /data/ssl/intermediateCA1/certs/intermediate1.crt
+#################################################################################################################################################################
+#################################################################################################################################################################
+#################################################################################################################################################################
+#################################################################################################################################################################
+mkdir -p /data/ssl/client/
+openssl genpkey -algorithm RSA -out /data/ssl/client/nginx-edge.key
+chmod 400 /data/ssl/client/nginx-edge.key
+openssl req -new -key  /data/ssl/client/nginx-edge.key -sha256 -out  /data/ssl/client/nginx-edge.csr -subj "/CN=nginx-edge.apps.ose.example.com" 
+openssl ca -config openssl_intermediate3.cnf -extensions server_cert -days 375 -notext -md sha256 -in  /data/ssl/client/nginx-edge.csr -out  /data/ssl/client/nginx-edge.crt
+openssl x509 -noout -text -in /data/ssl/client/nginx-edge.crt
+
+cat /data/ssl/client/nginx-edge.crt /data/ssl/intermediateCA3/certs/intermediate3.crt /data/ssl/intermediateCA2/certs/intermediate2.crt /data/ssl/intermediateCA1/certs/intermediate1.crt /data/ssl/rootCA/certs/ca.crt > /data/ssl/client/nginx-edge-ca-chain.crt
+
+openssl verify -CAfile /data/ssl/client/nginx-edge-ca-chain.crt /data/ssl/intermediateCA1/certs/intermediate1.crt
+openssl verify -CAfile /data/ssl/client/nginx-edge-ca-chain.crt /data/ssl/intermediateCA2/certs/intermediate2.crt
+openssl verify -CAfile /data/ssl/client/nginx-edge-ca-chain.crt /data/ssl/intermediateCA3/certs/intermediate3.crt
+openssl verify -CAfile /data/ssl/client/nginx-edge-ca-chain.crt /data/ssl/client/nginx-edge.crt
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+mkdir -p /data/ssl/client/
+openssl genpkey -algorithm RSA -out /data/ssl/client/nginx-pass.key
+chmod 400 /data/ssl/client/nginx-pass.key
+openssl req -new -key  /data/ssl/client/nginx-pass.key -sha256 -out  /data/ssl/client/nginx-pass.csr -subj "/CN=nginx-pass.apps.ose.example.com" 
+openssl ca -config openssl_intermediate3.cnf -extensions server_cert -days 375 -notext -md sha256 -in  /data/ssl/client/nginx-pass.csr -out  /data/ssl/client/nginx-pass.crt
+openssl x509 -noout -text -in /data/ssl/client/nginx-pass.crt
+
+cat /data/ssl/client/nginx-pass.crt /data/ssl/intermediateCA3/certs/intermediate3.crt /data/ssl/intermediateCA2/certs/intermediate2.crt /data/ssl/intermediateCA1/certs/intermediate1.crt /data/ssl/rootCA/certs/ca.crt > /data/ssl/client/nginx-pass-ca-chain.crt
+
+openssl verify -CAfile /data/ssl/client/nginx-pass-ca-chain.crt /data/ssl/intermediateCA1/certs/intermediate1.crt
+openssl verify -CAfile /data/ssl/client/nginx-pass-ca-chain.crt /data/ssl/intermediateCA2/certs/intermediate2.crt
+openssl verify -CAfile /data/ssl/client/nginx-pass-ca-chain.crt /data/ssl/intermediateCA3/certs/intermediate3.crt
+openssl verify -CAfile /data/ssl/client/nginx-pass-ca-chain.crt /data/ssl/client/nginx-pass.crt
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+mkdir -p /data/ssl/client/
+
+openssl genpkey -algorithm RSA -out /data/ssl/client/nginx-reencrpt.key
+chmod 400 /data/ssl/client/nginx-reencrpt.key
+openssl req -new -key  /data/ssl/client/nginx-reencrpt.key -sha256 -out  /data/ssl/client/nginx-reencrpt.csr -subj "/CN=nginx-reencrpt.apps.ose.example.com" 
+openssl ca -config openssl_intermediate3.cnf -extensions server_cert -days 375 -notext -md sha256 -in  /data/ssl/client/nginx-reencrpt.csr -out  /data/ssl/client/nginx-reencrpt.crt
+
+openssl x509 -noout -text -in /data/ssl/client/nginx-reencrpt.crt
+
+cat /data/ssl/client/nginx-reencrpt.crt /data/ssl/intermediateCA3/certs/intermediate3.crt /data/ssl/intermediateCA2/certs/intermediate2.crt /data/ssl/intermediateCA1/certs/intermediate1.crt /data/ssl/rootCA/certs/ca.crt > /data/ssl/client/nginx-reencrpt-ca-chain.crt
+
+openssl verify -CAfile /data/ssl/client/nginx-reencrpt-ca-chain.crt /data/ssl/intermediateCA1/certs/intermediate1.crt
+openssl verify -CAfile /data/ssl/client/nginx-reencrpt-ca-chain.crt /data/ssl/intermediateCA2/certs/intermediate2.crt
+openssl verify -CAfile /data/ssl/client/nginx-reencrpt-ca-chain.crt /data/ssl/intermediateCA3/certs/intermediate3.crt
+openssl verify -CAfile /data/ssl/client/nginx-reencrpt-ca-chain.crt /data/ssl/client/nginx-reencrpt.crt
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+> /data/ssl/intermediateCA3/index.tx
+mkdir -p /data/ssl/client/
+openssl genpkey -algorithm RSA -out /data/ssl/client/nginx-reencrpt-route.key
+chmod 400 /data/ssl/client/nginx-reencrpt-route.key
+openssl req -new -key /data/ssl/client/nginx-reencrpt-route.key -sha256 -out  /data/ssl/client/nginx-reencrpt-route.csr -subj "/CN=nginx-reencrpt.apps.ose.example.com" 
+openssl ca -config openssl_intermediate3.cnf -extensions server_cert -days 375 -notext -md sha256 -in  /data/ssl/client/nginx-reencrpt-route.csr -out  /data/ssl/client/nginx-reencrpt-route.crt
+openssl x509 -noout -text -in /data/ssl/client/nginx-reencrpt-route.crt
+
+cat  /data/ssl/client/nginx-reencrpt-route.crt  /data/ssl/intermediateCA3/certs/intermediate3.crt /data/ssl/intermediateCA2/certs/intermediate2.crt /data/ssl/intermediateCA1/certs/intermediate1.crt /data/ssl/rootCA/certs/ca.crt> /data/ssl/client/nginx-reencrpt-route-ca-chain.crt
+
+openssl verify -CAfile  /data/ssl/client/nginx-reencrpt-route-ca-chain.crt /data/ssl/intermediateCA1/certs/intermediate1.crt
+openssl verify -CAfile  /data/ssl/client/nginx-reencrpt-route-ca-chain.crt /data/ssl/intermediateCA2/certs/intermediate2.crt
+openssl verify -CAfile  /data/ssl/client/nginx-reencrpt-route-ca-chain.crt /data/ssl/intermediateCA3/certs/intermediate3.crt
+openssl verify -CAfile  /data/ssl/client/nginx-reencrpt-route-ca-chain.crt /data/ssl/client/nginx-reencrpt-route.crt
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+openssl genpkey -algorithm RSA -out /data/ssl/client/nginx-mtls.key
+chmod 400 /data/ssl/client/nginx-mtls.key
+openssl req -new -key /data/ssl/client/nginx-mtls.key -sha256 -out  /data/ssl/client/nginx-mtls.csr -subj "/CN=nginx-mtls.apps.ose.example.com" 
+openssl ca -config openssl_intermediate3.cnf -extensions server_cert -days 375 -notext -md sha256 -in  /data/ssl/client/nginx-mtls.csr -out  /data/ssl/client/nginx-mtls.crt
+openssl x509 -noout -text -in /data/ssl/client/nginx-reencrpt-route.crt
+
+cat  /data/ssl/client/nginx-mtls.crt  /data/ssl/intermediateCA3/certs/intermediate3.crt /data/ssl/intermediateCA2/certs/intermediate2.crt /data/ssl/intermediateCA1/certs/intermediate1.crt /data/ssl/rootCA/certs/ca.crt> /data/ssl/client/nginx-mtls-ca-chain.crt
+
+openssl verify -CAfile  /data/ssl/client/nginx-mtls-ca-chain.crt /data/ssl/intermediateCA1/certs/intermediate1.crt
+openssl verify -CAfile  /data/ssl/client/nginx-mtls-ca-chain.crt /data/ssl/intermediateCA2/certs/intermediate2.crt
+openssl verify -CAfile  /data/ssl/client/nginx-mtls-ca-chain.crt /data/ssl/intermediateCA3/certs/intermediate3.crt
+openssl verify -CAfile  /data/ssl/client/nginx-mtls-ca-chain.crt /data/ssl/client/nginx-mtls.crt
+###########################################################################################################################################################
+openssl genpkey -algorithm RSA -out /data/ssl/client/client.key
+chmod 400 /data/ssl/client/client.key
+openssl req -new -key /data/ssl/client/client.key -sha256 -out  /data/ssl/client/client.csr -subj "/CN=workstation.example.com" 
+openssl ca -config openssl_intermediate3.cnf -extensions server_cert -days 375 -notext -md sha256 -in  /data/ssl/client/client.csr -out /data/ssl/client/client.crt
+openssl x509 -noout -text -in /data/ssl/client/client.crt
+
+cat  /data/ssl/client/client.crt  /data/ssl/intermediateCA3/certs/intermediate3.crt /data/ssl/intermediateCA2/certs/intermediate2.crt /data/ssl/intermediateCA1/certs/intermediate1.crt /data/ssl/rootCA/certs/ca.crt> /data/ssl/client/client-ca-chain.crt
+
+openssl verify -CAfile  /data/ssl/client/client-ca-chain.crt /data/ssl/intermediateCA1/certs/intermediate1.crt
+openssl verify -CAfile  /data/ssl/client/client-ca-chain.crt /data/ssl/intermediateCA2/certs/intermediate2.crt
+openssl verify -CAfile  /data/ssl/client/client-ca-chain.crt /data/ssl/intermediateCA3/certs/intermediate3.crt
+openssl verify -CAfile  /data/ssl/client/client-ca-chain.crt /data/ssl/client/client.crt
+##########################################################################################################################################################
