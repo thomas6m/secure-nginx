@@ -1,0 +1,132 @@
+openssl req -new -x509 -nodes -days 365 -keyout ca.key -out ca.crt -subj "/C=SG/ST=Singapore/L=Bedok/O=Home/OU=IT Department/CN=ca.ose.example.com"
+
+openssl req -newkey rsa:2048 -nodes -keyout tls.key -out tls.csr -subj "/C=SG/ST=Singapore/L=Bedok/O=Home/OU=IT Department/CN=nginx-mtls.apps.ose.example.com"
+openssl x509 -req -days 365 -in tls.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out tls.crt 
+
+openssl req -newkey rsa:2048 -nodes -keyout client.key -out client.csr -subj "/C=SG/ST=Singapore/L=Bedok/O=Home/OU=IT Department/CN=workstation.example.com"
+openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out client.crt
+###########################################################################################################################################
+vi index.html
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Welcome to mtls NGINX</title>
+    </head>
+    <body>
+        <h1>Hello, world!</h1>
+    </body>
+    </html>
+###########################################################################################################################################
+oc create cm nginx-html-content --from-file index.html
+###########################################################################################################################################
+vi default.conf
+
+server {
+          listen 443 ssl;
+          root /usr/share/nginx/html;
+          index index.html;
+
+      server_name localhost;
+      ssl_certificate /etc/nginx/ssl/tls.crt;
+      ssl_certificate_key /etc/nginx/ssl/tls.key; 
+      ssl_client_certificate /etc/nginx/client_certs/ca.crt;
+      ssl_verify_client on;
+      ssl_session_timeout 1d;
+      ssl_session_cache shared:SSL:50m;
+      ssl_session_tickets off;
+      # modern configuration. tweak to your needs.
+      ssl_protocols TLSv1.2;
+      ssl_ciphers 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256';
+      ssl_prefer_server_ciphers on; 
+      # HSTS (ngx_http_headers_module is required) (15768000 seconds = 6 months)
+      add_header Strict-Transport-Security max-age=15768000;
+      # OCSP Stapling ---
+      # fetch OCSP records from URL in ssl_certificate and cache them
+      ssl_stapling on;
+      ssl_stapling_verify on;
+      location / {
+              try_files $uri $uri/ =404;
+      }
+  }
+###########################################################################################################################################
+oc create cm nginx-mtls-cm --from-file default.conf
+oc create sa nginx-mtls-sa
+oc adm policy add-scc-to-user anyuid -z nginx-mtls-sa
+
+oc create secret tls nginx-mtls-certs --cert /root/nginx/mtls/tls.crt --key /root/nginx/mtls/tls.key
+oc create secret generic mtls-ca-secret --from-file=ca.crt=/root/nginx/mtls/ca.crt
+###########################################################################################################################################
+vi nginx-mtls-deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-mtls
+  labels:
+    deployment: nginx-mtls
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      deployment: nginx-mtls
+  template:
+    metadata:
+      labels:
+        deployment: nginx-mtls
+    spec:
+      containers:
+      - image: docker.io/nginx
+        name: nginx-pass
+        ports:
+        - containerPort: 443
+          protocol: TCP
+        volumeMounts:
+        - mountPath: "/etc/nginx/ssl"
+          name: tls-certs
+        - mountPath: "/etc/nginx/client_certs"
+          name: mtls-certs
+        - mountPath: "/etc/nginx/conf.d"
+          name: default-conf
+        - name: nginx-html-content
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: tls-certs
+        secret:
+          secretName: nginx-mtls-certs
+      - name: mtls-certs
+        secret:
+          secretName: mtls-ca-secret
+      - name: default-conf
+        configMap:
+          name: nginx-mtls-cm
+      - name: nginx-html-content
+        configMap:
+          name: nginx-html-content
+      serviceAccount:  nginx-mtls-sa
+      serviceAccountName:  nginx-mtls-sa
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    deployment: nginx-mtls
+  name: nginx-mtls
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 443
+  selector: 
+    deployment: nginx-mtls
+###########################################################################################################################################
+oc create -f nginx-mtls-deployment.yaml
+oc create route passthrough nginx-mtls --service nginx-mtls --port 443 --hostname=nginx-mtls.apps.ose.example.com
+oc get routes
+oc get svc
+###########################################################################################################################################
+https://nginx-mtls.apps.ose.example.com
+curl --cert client.crt --key client.key --cacert ca.crt https://nginx-mtls.apps.ose.example.com:443
+###########################################################################################################################################
+
+
