@@ -1,0 +1,116 @@
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
+metadata:
+  name: nginx-mtls
+  labels:
+    app: nginx-mtls
+    deployment: nginx-mtls
+spec:
+  replicas: 1
+  selector:
+    app: nginx-mtls
+  strategy:
+    type: Rolling
+    rollingParams:
+      updatePeriodSeconds: 1
+      intervalSeconds: 1
+      timeoutSeconds: 600
+      maxUnavailable: 25%
+      maxSurge: 25%
+  template:
+    metadata:
+      labels:
+        app: nginx-mtls
+    spec:
+      containers:
+      - image: docker.io/nginx:latest
+        name: nginx-mtls
+        ports:
+        - containerPort: 443
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 443
+            scheme: HTTPS
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 30
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 443
+            scheme: HTTPS
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        volumeMounts:
+        - mountPath: "/etc/nginx/ssl"
+          name: tls-certs
+          readOnly: true
+        - mountPath: "/etc/nginx/client_certs"
+          name: mtls-certs
+          readOnly: true
+        - mountPath: "/etc/nginx/conf.d"
+          name: default-conf
+          readOnly: true
+        - name: nginx-html-content
+          mountPath: /usr/share/nginx/html
+          readOnly: true
+      volumes:
+      - name: tls-certs
+        secret:
+          secretName: nginx-mtls-certs
+          defaultMode: 0644
+      - name: mtls-certs
+        secret:
+          secretName: mtls-ca-secret
+          defaultMode: 0644
+      - name: default-conf
+        configMap:
+          name: nginx-mtls-cm
+          defaultMode: 0644
+      - name: nginx-html-content
+        configMap:
+          name: nginx-html-content
+          defaultMode: 0644
+      serviceAccount: nginx-mtls-sa
+      serviceAccountName: nginx-mtls-sa
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+  triggers:
+  - type: ConfigChange
+  - type: ImageChange
+    imageChangeParams:
+      automatic: true
+      containerNames:
+      - nginx-mtls
+      from:
+        kind: ImageStreamTag
+        name: nginx:latest
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nginx-mtls
+    deployment: nginx-mtls
+  name: nginx-mtls
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 443
+  selector: 
+    app: nginx-mtls
+  type: ClusterIP
