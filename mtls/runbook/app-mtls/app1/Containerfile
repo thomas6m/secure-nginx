@@ -1,0 +1,12 @@
+FROM python:3.10-slim
+
+RUN adduser --disabled-password --gecos '' appuser
+WORKDIR /home/appuser
+
+COPY app.py /home/appuser/
+RUN chown -R appuser:appuser /home/appuser && chmod -R 755 /home/appuser
+RUN pip install flask requests
+
+USER appuser
+EXPOSE 5001
+CMD ["python", "app.py"]
