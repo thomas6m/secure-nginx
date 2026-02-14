@@ -129,10 +129,10 @@ subjectAltName = @alt_names
 
 [alt_names]
 DNS.1 = localhost
-DNS.2 = ingress-edge.apps.sno.example.com
-DNS.3 = ingress-passthrough.apps.sno.example.com
-DNS.4 = ingress-reencrypt.apps.sno.example.com
-DNS.5 = ingress-http.apps.sno.example.com
+DNS.2 = ingress-edge.apps.sno1.example.com
+DNS.3 = ingress-passthrough.apps.sno1.example.com
+DNS.4 = ingress-reencrypt.apps.sno1.example.com
+DNS.5 = ingress-http.apps.sno1.example.com
 DNS.6 = ingress-http.default.svc.cluster.local
 DNS.7 = ingress-https.default.svc.cluster.local
 EOF
